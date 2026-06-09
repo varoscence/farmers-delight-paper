@@ -17,7 +17,9 @@ import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.io.*;
 import java.util.*;
+import java.util.Base64;
 
 public class CookingPotManager {
 
@@ -64,16 +66,19 @@ public class CookingPotManager {
             plugin.getServer().createInventory(null, 27,
                 Component.text("Cooking Pot", NamedTextColor.DARK_RED)));
 
-        // Only restore saved contents when creating the inventory for the first time.
-        // After that the live inventory is authoritative (cooking task updates it directly).
+        // Restore inventory on first open this session.
         if (isNew) {
             ItemStack[] saved = guiContents.get(k);
             if (saved != null) {
+                // In-memory copy from this session
                 ItemStack[] restored = new ItemStack[27];
                 for (int s : INGREDIENT_SLOTS) if (s < saved.length) restored[s] = saved[s];
                 if (OUTPUT_SLOT < saved.length) restored[OUTPUT_SLOT] = saved[OUTPUT_SLOT];
                 if (CONTAINER_SLOT < saved.length) restored[CONTAINER_SLOT] = saved[CONTAINER_SLOT];
                 inv.setContents(restored);
+            } else {
+                // Persisted from previous session — load from storage
+                loadContentsFromStorage(loc, inv);
             }
         }
 
@@ -176,10 +181,24 @@ public class CookingPotManager {
     }
 
     public void onClose(Location potLoc, Inventory inv) {
-        guiContents.put(key(potLoc), functionalContents(inv));
+        ItemStack[] contents = functionalContents(inv);
+        guiContents.put(key(potLoc), contents);
+        saveContentsToStorage(potLoc, contents); // survive server restart
     }
 
     public void saveAll() {
+        // Also flush any open pot inventories before shutdown
+        for (Map.Entry<String, Inventory> e : openGuis.entrySet()) {
+            String k = e.getKey();
+            String[] parts = k.split(":");
+            World world = plugin.getServer().getWorld(parts[0]);
+            if (world == null) continue;
+            Location loc = new Location(world,
+                Integer.parseInt(parts[1]),
+                Integer.parseInt(parts[2]),
+                Integer.parseInt(parts[3]));
+            saveContentsToStorage(loc, functionalContents(e.getValue()));
+        }
         storage.save();
     }
 
@@ -209,6 +228,57 @@ public class CookingPotManager {
             .color(NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
         item.setItemMeta(meta);
         return item;
+    }
+
+    // ── Persistence helpers ───────────────────────────────────────────────────
+
+    private void saveContentsToStorage(Location loc, ItemStack[] contents) {
+        int[] slots = {0, 1, 2, 3, 4, OUTPUT_SLOT, CONTAINER_SLOT};
+        for (int s : slots) {
+            ItemStack item = (s < contents.length) ? contents[s] : null;
+            String key = "slot_" + s;
+            if (item == null || item.getType() == Material.AIR) {
+                storage.remove(loc, key);
+            } else {
+                String encoded = serializeItem(item);
+                if (encoded != null) storage.set(loc, key, encoded);
+            }
+        }
+    }
+
+    private void loadContentsFromStorage(Location loc, Inventory inv) {
+        int[] slots = {0, 1, 2, 3, 4, OUTPUT_SLOT, CONTAINER_SLOT};
+        for (int s : slots) {
+            String encoded = storage.get(loc, "slot_" + s);
+            if (encoded != null) {
+                ItemStack item = deserializeItem(encoded);
+                if (item != null) inv.setItem(s, item);
+            }
+        }
+    }
+
+    private String serializeItem(ItemStack item) {
+        try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            try (DataOutputStream dos = new DataOutputStream(bos)) {
+                byte[] bytes = item.serializeAsBytes();
+                dos.writeInt(bytes.length);
+                dos.write(bytes);
+            }
+            return Base64.getEncoder().encodeToString(bos.toByteArray());
+        } catch (Exception e) { return null; }
+    }
+
+    private ItemStack deserializeItem(String data) {
+        try {
+            byte[] raw = Base64.getDecoder().decode(data);
+            try (DataInputStream dis = new DataInputStream(new ByteArrayInputStream(raw))) {
+                int len = dis.readInt();
+                byte[] itemBytes = new byte[len];
+                dis.readFully(itemBytes);
+                return ItemStack.deserializeBytes(itemBytes);
+            }
+        } catch (Exception e) { return null; }
     }
 
     private boolean isHeated(Location potLoc) {

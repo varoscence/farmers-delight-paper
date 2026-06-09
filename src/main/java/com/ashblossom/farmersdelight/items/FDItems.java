@@ -18,12 +18,12 @@ import java.util.List;
 
 public enum FDItems {
 
-    // TOOLS
-    FLINT_KNIFE(    "flint_knife",    "Flint Knife",     Material.WOODEN_SWORD,   1001, 0, 0, null, ItemType.KNIFE, 2.0f, 1.6f),
-    IRON_KNIFE(     "iron_knife",     "Iron Knife",      Material.IRON_SWORD,     1002, 0, 0, null, ItemType.KNIFE, 3.0f, 1.8f),
-    GOLDEN_KNIFE(   "golden_knife",   "Golden Knife",    Material.GOLDEN_SWORD,   1003, 0, 0, null, ItemType.KNIFE, 2.0f, 2.0f),
-    DIAMOND_KNIFE(  "diamond_knife",  "Diamond Knife",   Material.DIAMOND_SWORD,  1004, 0, 0, null, ItemType.KNIFE, 4.0f, 1.8f),
-    NETHERITE_KNIFE("netherite_knife","Netherite Knife", Material.NETHERITE_SWORD,1005, 0, 0, null, ItemType.KNIFE, 4.5f, 1.9f),
+    // TOOLS — use PAPER base so vanilla sword models are never overridden
+    FLINT_KNIFE(    "flint_knife",    "Flint Knife",     Material.PAPER, 1001, 0, 0, null, ItemType.KNIFE, 2.0f, 1.6f),
+    IRON_KNIFE(     "iron_knife",     "Iron Knife",      Material.PAPER, 1002, 0, 0, null, ItemType.KNIFE, 3.0f, 1.8f),
+    GOLDEN_KNIFE(   "golden_knife",   "Golden Knife",    Material.PAPER, 1003, 0, 0, null, ItemType.KNIFE, 2.0f, 2.0f),
+    DIAMOND_KNIFE(  "diamond_knife",  "Diamond Knife",   Material.PAPER, 1004, 0, 0, null, ItemType.KNIFE, 4.0f, 1.8f),
+    NETHERITE_KNIFE("netherite_knife","Netherite Knife", Material.PAPER, 1005, 0, 0, null, ItemType.KNIFE, 4.5f, 1.9f),
 
     // MATERIALS
     STRAW(        "straw",        "Straw",        Material.PAPER, 2001, 0, 0, null, ItemType.MATERIAL, 0, 0),

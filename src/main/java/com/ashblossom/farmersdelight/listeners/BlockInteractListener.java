@@ -3,6 +3,7 @@ package com.ashblossom.farmersdelight.listeners;
 import com.ashblossom.farmersdelight.FarmersDelightPlugin;
 import com.ashblossom.farmersdelight.blocks.CookingPotManager;
 import com.ashblossom.farmersdelight.blocks.CuttingBoardManager;
+import com.ashblossom.farmersdelight.blocks.SkilletManager;
 import com.ashblossom.farmersdelight.crops.CropManager;
 import com.ashblossom.farmersdelight.gui.FDInventoryHolder;
 import com.ashblossom.farmersdelight.gui.GuideBookGui;
@@ -25,11 +26,14 @@ public class BlockInteractListener implements Listener {
     private final FarmersDelightPlugin plugin;
     private final CookingPotManager pots;
     private final CuttingBoardManager boards;
+    private final SkilletManager skillets;
 
-    public BlockInteractListener(FarmersDelightPlugin plugin, CookingPotManager pots, CuttingBoardManager boards) {
+    public BlockInteractListener(FarmersDelightPlugin plugin, CookingPotManager pots,
+                                  CuttingBoardManager boards, SkilletManager skillets) {
         this.plugin = plugin;
         this.pots = pots;
         this.boards = boards;
+        this.skillets = skillets;
     }
 
     @EventHandler
@@ -50,6 +54,15 @@ public class BlockInteractListener implements Listener {
         Block block = event.getClickedBlock();
         if (block == null) return;
         FDItems fdHeld = (hand != null) ? FDItems.fromStack(hand) : null;
+
+        // ── Skillet: right-click heat source with skillet in hand ─────────
+        if (event.getAction() == Action.RIGHT_CLICK_BLOCK
+                && fdHeld == FDItems.SKILLET
+                && block != null && skillets.isHeatSource(block)) {
+            event.setCancelled(true);
+            skillets.tryFry(player, block);
+            return;
+        }
 
         // ── Place Cooking Pot ──────────────────────────────────────────────
         if (fdHeld == FDItems.COOKING_POT_ITEM && event.getAction() == Action.RIGHT_CLICK_BLOCK) {

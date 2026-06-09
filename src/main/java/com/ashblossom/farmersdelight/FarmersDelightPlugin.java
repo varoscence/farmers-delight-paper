@@ -2,6 +2,7 @@ package com.ashblossom.farmersdelight;
 
 import com.ashblossom.farmersdelight.blocks.CookingPotManager;
 import com.ashblossom.farmersdelight.blocks.CuttingBoardManager;
+import com.ashblossom.farmersdelight.blocks.SkilletManager;
 import com.ashblossom.farmersdelight.crops.CropManager;
 import com.ashblossom.farmersdelight.listeners.AdminCommandListener;
 import com.ashblossom.farmersdelight.listeners.BlockInteractListener;
@@ -19,6 +20,7 @@ public class FarmersDelightPlugin extends JavaPlugin {
     private ResourcePackServer resourcePackServer;
     private CookingPotManager cookingPotManager;
     private CuttingBoardManager cuttingBoardManager;
+    private SkilletManager skilletManager;
 
     @Override
     public void onEnable() {
@@ -34,9 +36,11 @@ public class FarmersDelightPlugin extends JavaPlugin {
 
         cookingPotManager = new CookingPotManager(this);
         cuttingBoardManager = new CuttingBoardManager(this);
+        skilletManager = new SkilletManager();
         CropManager.init(this);
 
-        getServer().getPluginManager().registerEvents(new BlockInteractListener(this, cookingPotManager, cuttingBoardManager), this);
+        getServer().getPluginManager().registerEvents(
+            new BlockInteractListener(this, cookingPotManager, cuttingBoardManager, skilletManager), this);
         getServer().getPluginManager().registerEvents(new CropListener(this), this);
         getServer().getPluginManager().registerEvents(new FoodConsumeListener(), this);
         getServer().getPluginManager().registerEvents(new PlayerJoinListener(this, resourcePackServer), this);

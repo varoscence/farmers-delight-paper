@@ -152,8 +152,7 @@ public class ResourcePackServer {
         if (overrides.isEmpty()) return null;
 
         String matName = mat.name().toLowerCase();
-        boolean isTool = matName.contains("sword") || matName.contains("axe") || matName.contains("pickaxe");
-        String parent = isTool ? "minecraft:item/handheld" : "minecraft:item/generated";
+        String parent = "minecraft:item/generated";
 
         JsonObject textures = new JsonObject();
         textures.addProperty("layer0", "minecraft:item/" + matName);
