@@ -56,12 +56,6 @@ public class FDRecipes {
         CUTTING.add(CuttingRecipe.of(Material.BREAD).gives(FDItems.BREAD_SLICE.create(2)).build());
         CUTTING.add(CuttingRecipe.of(FDItems.CAKE_SLICE).gives(FDItems.CAKE_SLICE.create()).build());
 
-        // Tree bark / wood logs
-        CUTTING.add(CuttingRecipe.of(Material.OAK_LOG).gives(new org.bukkit.inventory.ItemStack(Material.OAK_PLANKS, 6)).build());
-        CUTTING.add(CuttingRecipe.of(Material.SPRUCE_LOG).gives(new org.bukkit.inventory.ItemStack(Material.SPRUCE_PLANKS, 6)).build());
-        CUTTING.add(CuttingRecipe.of(Material.BIRCH_LOG).gives(new org.bukkit.inventory.ItemStack(Material.BIRCH_PLANKS, 6)).build());
-        CUTTING.add(CuttingRecipe.of(Material.JUNGLE_LOG).gives(new org.bukkit.inventory.ItemStack(Material.JUNGLE_PLANKS, 6)).build());
-
         // Kelp roll
         CUTTING.add(CuttingRecipe.of(FDItems.KELP_ROLL).gives(FDItems.KELP_ROLL_SLICE.create(4)).build());
     }
