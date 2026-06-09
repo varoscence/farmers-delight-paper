@@ -9,15 +9,16 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Arrays;
+import java.util.*;
 import java.util.zip.*;
+import org.bukkit.Material;
 
 public class ResourcePackServer {
 
     private final FarmersDelightPlugin plugin;
     private HttpServer server;
     private byte[] packBytes;
-    private byte[] packHash;
+    private byte[] packHash = new byte[20];
     private String packUrl;
 
     public ResourcePackServer(FarmersDelightPlugin plugin) {
@@ -25,6 +26,27 @@ public class ResourcePackServer {
     }
 
     public void start() {
+        String externalUrl = plugin.getConfig().getString("resource-pack-url", "").trim();
+
+        if (!externalUrl.isEmpty()) {
+            packUrl = externalUrl;
+            String sha1Url = externalUrl.replaceAll("pack\\.zip$", "pack.sha1");
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                try {
+                    InputStream in = new java.net.URI(sha1Url).toURL().openStream();
+                    String hex = new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
+                    in.close();
+                    packHash = hexToBytes(hex);
+                    plugin.getLogger().info("Resource pack SHA1 loaded: " + hex);
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Could not fetch pack SHA1 from " + sha1Url + ": " + e.getMessage());
+                }
+            });
+            plugin.getLogger().info("Using external resource pack: " + packUrl);
+            return;
+        }
+
+        // Self-hosted fallback
         rebuildPack();
         int port = plugin.getConfig().getInt("resource-pack-port", 8766);
         String host = plugin.getConfig().getString("resource-pack-host", "localhost");
@@ -51,25 +73,30 @@ public class ResourcePackServer {
         try {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             try (ZipOutputStream zip = new ZipOutputStream(bos)) {
-                // pack.mcmeta
                 addResource(zip, "pack.mcmeta", "pack/pack.mcmeta");
 
-                // Model JSON for each item (individual model file)
+                // Model files (standard parent/textures format)
                 for (FDItems item : FDItems.values()) {
-                    String modelPath = "assets/farmersdelight/models/item/" + item.getId() + ".json";
-                    String modelJson = buildItemModel(item);
-                    addString(zip, modelPath, modelJson);
+                    addString(zip, "assets/farmersdelight/models/item/" + item.getId() + ".json",
+                        buildModelFile(item));
                 }
 
-                // paper.json — master CMD dispatch file
-                addString(zip, "assets/minecraft/items/paper.json", buildPaperJson());
-
-                // Textures — loaded from plugin resources
+                // Item definition files — one per base material, all with CMD dispatch
+                Map<Material, List<FDItems>> byMaterial = new LinkedHashMap<>();
                 for (FDItems item : FDItems.values()) {
-                    String texPath = "assets/farmersdelight/textures/item/" + item.getId() + ".png";
+                    byMaterial.computeIfAbsent(item.getBaseMaterial(), k -> new ArrayList<>()).add(item);
+                }
+                for (Map.Entry<Material, List<FDItems>> entry : byMaterial.entrySet()) {
+                    String name = entry.getKey().name().toLowerCase();
+                    addString(zip, "assets/minecraft/items/" + name + ".json",
+                        buildItemDefinition(entry.getKey(), entry.getValue()));
+                }
+
+                // Textures
+                for (FDItems item : FDItems.values()) {
                     InputStream tex = plugin.getResource("textures/item/" + item.getId() + ".png");
                     if (tex != null) {
-                        zip.putNextEntry(new ZipEntry(texPath));
+                        zip.putNextEntry(new ZipEntry("assets/farmersdelight/textures/item/" + item.getId() + ".png"));
                         tex.transferTo(zip);
                         zip.closeEntry();
                     }
@@ -80,29 +107,26 @@ public class ResourcePackServer {
         } catch (Exception e) {
             plugin.getLogger().severe("Failed to build resource pack: " + e.getMessage());
             packBytes = new byte[0];
-            packHash = new byte[20];
         }
     }
 
-    private String buildItemModel(FDItems item) {
-        // Flat item model pointing to our texture
+    private String buildModelFile(FDItems item) {
         JsonObject root = new JsonObject();
-        JsonObject model = new JsonObject();
-        model.addProperty("type", "minecraft:model");
-        model.addProperty("model", "farmersdelight:item/" + item.getId());
-        root.add("model", model);
+        root.addProperty("parent", "minecraft:item/generated");
+        JsonObject textures = new JsonObject();
+        textures.addProperty("layer0", "farmersdelight:item/" + item.getId());
+        root.add("textures", textures);
         return new Gson().toJson(root);
     }
 
-    private String buildPaperJson() {
-        // 1.21.2+ format: select on custom_model_data
+    private String buildItemDefinition(Material material, List<FDItems> items) {
         JsonObject root = new JsonObject();
         JsonObject model = new JsonObject();
         model.addProperty("type", "minecraft:select");
         model.addProperty("property", "minecraft:custom_model_data");
 
         JsonArray cases = new JsonArray();
-        for (FDItems item : FDItems.values()) {
+        for (FDItems item : items) {
             JsonObject c = new JsonObject();
             JsonArray when = new JsonArray();
             when.add(String.valueOf(item.getCmd()));
@@ -115,10 +139,9 @@ public class ResourcePackServer {
         }
         model.add("cases", cases);
 
-        // fallback = vanilla paper model
         JsonObject fallback = new JsonObject();
         fallback.addProperty("type", "minecraft:model");
-        fallback.addProperty("model", "minecraft:item/paper");
+        fallback.addProperty("model", "minecraft:item/" + material.name().toLowerCase());
         model.add("fallback", fallback);
 
         root.add("model", model);
@@ -138,6 +161,16 @@ public class ResourcePackServer {
         zip.putNextEntry(new ZipEntry(entryName));
         zip.write(content.getBytes(StandardCharsets.UTF_8));
         zip.closeEntry();
+    }
+
+    private static byte[] hexToBytes(String hex) {
+        int len = hex.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
+                                 + Character.digit(hex.charAt(i + 1), 16));
+        }
+        return data;
     }
 
     public String getUrl() { return packUrl; }

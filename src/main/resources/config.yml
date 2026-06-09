@@ -1,3 +1,8 @@
 # Farmer's Delight Paper - Config
+
+# External resource pack URL (GitHub Pages). Leave empty to use built-in HTTP server.
+resource-pack-url: "https://varoscence.github.io/farmers-delight-paper/pack.zip"
+
+# Only used when resource-pack-url is empty (self-hosted fallback)
 resource-pack-host: "136.175.187.108"
 resource-pack-port: 8766

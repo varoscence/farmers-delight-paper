@@ -7,6 +7,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,14 +36,14 @@ jobs:
             "wheat_dough" "bread_slice" "cake_slice"
             "minced_beef" "bacon" "ham_slice" "smoked_ham" "honey_glazed_ham"
             "beef_stew" "chicken_soup" "fish_stew" "vegetable_soup" "pumpkin_soup"
-            "mushroom_stew" "noodle_soup" "ramen" "borscht" "potato_soup"
+            "noodle_soup" "ramen" "borscht" "potato_soup"
             "hamburger" "chicken_sandwich" "bacon_sandwich" "mutton_wrap" "salmon_roll"
             "rice_bowl" "fried_rice" "pasta_with_meatballs" "pasta_with_mutton_chop"
             "hot_cocoa" "apple_cider" "melon_juice" "tomato_sauce"
-            "roast_chicken" "honey_glazed_ham" "kelp_roll" "kelp_roll_slice"
-            "shepherd_pie" "apple_pie" "birthday_cake"
-            "bone_meal_bag" "straw_bale" "canvas" "hemp_rope" "rope_roll" "sack" "basket"
-            "cooking_pot" "cutting_board" "dried_kelp_block"
+            "roast_chicken" "kelp_roll" "kelp_roll_slice"
+            "shepherds_pie" "apple_pie" "birthday_cake"
+            "bone_meal_bag" "straw" "canvas" "rope" "rope_roll" "sack" "basket"
+            "cooking_pot" "cutting_board"
           )
           for item in "${ITEMS[@]}"; do
             echo "Downloading $item.png"
@@ -49,6 +52,23 @@ jobs:
 
       - name: Build with Maven
         run: mvn package -q
+
+      - name: Build resource pack
+        run: python3 generate_pack.py target/pack.zip
+
+      - name: Prepare GitHub Pages content
+        run: |
+          mkdir -p target/pages
+          cp target/pack.zip target/pages/
+          cp target/pack.sha1 target/pages/
+
+      - name: Deploy resource pack to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: target/pages
+          publish_branch: gh-pages
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
