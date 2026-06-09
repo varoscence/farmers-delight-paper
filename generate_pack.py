@@ -39,7 +39,7 @@ for mat, mat_items in by_material.items():
     mat_lower = mat.lower()
     cases = [
         {
-            "when": [str(cmd)],
+            "when": cmd,  # integer — required in 1.21.5+ (was string array ["N"] in 1.21.4)
             "model": {"type": "minecraft:model", "model": f"farmersdelight:item/{id_}"}
         }
         for id_, cmd in mat_items

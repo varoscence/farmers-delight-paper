@@ -130,9 +130,7 @@ public class ResourcePackServer {
         JsonArray cases = new JsonArray();
         for (FDItems item : items) {
             JsonObject c = new JsonObject();
-            JsonArray when = new JsonArray();
-            when.add(String.valueOf(item.getCmd()));
-            c.add("when", when);
+            c.addProperty("when", item.getCmd()); // integer — required in 1.21.5+
             JsonObject mdl = new JsonObject();
             mdl.addProperty("type", "minecraft:model");
             mdl.addProperty("model", "farmersdelight:item/" + item.getId());
