@@ -9,7 +9,7 @@ load: STARTUP
 commands:
   fd:
     description: Farmer's Delight admin commands
-    usage: /fd <give|list|reload> [args]
+    usage: /fd <give|list|reload|guide> [args]
     permission: farmersdelight.admin
 
 permissions:

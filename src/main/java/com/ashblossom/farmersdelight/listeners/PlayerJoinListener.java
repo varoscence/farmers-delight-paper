@@ -23,9 +23,11 @@ public class PlayerJoinListener implements Listener {
         Player player = event.getPlayer();
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             String url = packServer.getUrl();
+            if (url == null) return;
             byte[] hash = packServer.getHash();
-            if (url == null || hash == null) return;
-            player.setResourcePack(UUID.randomUUID(), url, hash,
+            // Pass null hash when unavailable so Minecraft skips verification instead of failing
+            byte[] hashArg = (hash != null && hash.length > 0) ? hash : null;
+            player.setResourcePack(UUID.randomUUID(), url, hashArg,
                 net.kyori.adventure.text.Component.text("Farmer's Delight resource pack"), true);
         }, 20L);
     }

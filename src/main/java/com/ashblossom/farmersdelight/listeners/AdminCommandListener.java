@@ -1,6 +1,7 @@
 package com.ashblossom.farmersdelight.listeners;
 
 import com.ashblossom.farmersdelight.FarmersDelightPlugin;
+import com.ashblossom.farmersdelight.gui.GuideBookGui;
 import com.ashblossom.farmersdelight.items.FDItems;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -51,6 +52,14 @@ public class AdminCommandListener implements Listener, CommandExecutor {
                 plugin.getResourcePackServer().rebuildPack();
                 sender.sendMessage(Component.text("Resource pack rebuilt.", NamedTextColor.GREEN));
             }
+            case "guide" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Must be a player.");
+                    return true;
+                }
+                player.getInventory().addItem(GuideBookGui.createGuideItem());
+                player.sendMessage(Component.text("Given: Farmer's Guide", NamedTextColor.GREEN));
+            }
             default -> sendHelp(sender);
         }
         return true;
@@ -60,6 +69,7 @@ public class AdminCommandListener implements Listener, CommandExecutor {
         s.sendMessage(Component.text("/fd give <item_id> [amount]", NamedTextColor.YELLOW));
         s.sendMessage(Component.text("/fd list", NamedTextColor.YELLOW));
         s.sendMessage(Component.text("/fd reload", NamedTextColor.YELLOW));
+        s.sendMessage(Component.text("/fd guide", NamedTextColor.YELLOW));
     }
 
     private int parseInt(String s, int def) {

@@ -18,7 +18,7 @@ public class ResourcePackServer {
     private final FarmersDelightPlugin plugin;
     private HttpServer server;
     private byte[] packBytes;
-    private byte[] packHash = new byte[20];
+    private byte[] packHash = new byte[0];
     private String packUrl;
 
     public ResourcePackServer(FarmersDelightPlugin plugin) {
@@ -31,17 +31,19 @@ public class ResourcePackServer {
         if (!externalUrl.isEmpty()) {
             packUrl = externalUrl;
             String sha1Url = externalUrl.replaceAll("pack\\.zip$", "pack.sha1");
-            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-                try {
-                    InputStream in = new java.net.URI(sha1Url).toURL().openStream();
+            try {
+                java.net.URLConnection conn = new java.net.URI(sha1Url).toURL().openConnection();
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                try (InputStream in = conn.getInputStream()) {
                     String hex = new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
-                    in.close();
                     packHash = hexToBytes(hex);
                     plugin.getLogger().info("Resource pack SHA1 loaded: " + hex);
-                } catch (Exception e) {
-                    plugin.getLogger().warning("Could not fetch pack SHA1 from " + sha1Url + ": " + e.getMessage());
                 }
-            });
+            } catch (Exception e) {
+                plugin.getLogger().warning("Could not fetch pack SHA1 from " + sha1Url + ": " + e.getMessage());
+                plugin.getLogger().warning("Players will be prompted without hash verification.");
+            }
             plugin.getLogger().info("Using external resource pack: " + packUrl);
             return;
         }

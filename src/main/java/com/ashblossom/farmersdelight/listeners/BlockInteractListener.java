@@ -4,8 +4,12 @@ import com.ashblossom.farmersdelight.FarmersDelightPlugin;
 import com.ashblossom.farmersdelight.blocks.CookingPotManager;
 import com.ashblossom.farmersdelight.blocks.CuttingBoardManager;
 import com.ashblossom.farmersdelight.crops.CropManager;
+import com.ashblossom.farmersdelight.gui.FDInventoryHolder;
+import com.ashblossom.farmersdelight.gui.GuideBookGui;
+import com.ashblossom.farmersdelight.gui.RecipeViewerGui;
 import com.ashblossom.farmersdelight.items.FDItems;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.type.Slab;
@@ -30,11 +34,21 @@ public class BlockInteractListener implements Listener {
 
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        ItemStack hand = event.getItem();
+
+        // ── Farmer's Guide book (works in air and on block) ─────────────────
+        if (GuideBookGui.isGuideBook(hand)
+                && (event.getAction() == Action.RIGHT_CLICK_AIR
+                    || event.getAction() == Action.RIGHT_CLICK_BLOCK)) {
+            event.setCancelled(true);
+            GuideBookGui.open(player);
+            return;
+        }
+
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK && event.getAction() != Action.LEFT_CLICK_BLOCK) return;
         Block block = event.getClickedBlock();
         if (block == null) return;
-        Player player = event.getPlayer();
-        ItemStack hand = event.getItem();
         FDItems fdHeld = (hand != null) ? FDItems.fromStack(hand) : null;
 
         // ── Place Cooking Pot ──────────────────────────────────────────────
@@ -94,7 +108,7 @@ public class BlockInteractListener implements Listener {
 
         // ── FD Crop planting ──────────────────────────────────────────────
         if (event.getAction() == Action.RIGHT_CLICK_BLOCK
-            && block.getType() == Material.FARMLAND && fdHeld != null) {
+                && block.getType() == Material.FARMLAND && fdHeld != null) {
             if (CropManager.CROP_BLOCKS.containsKey(fdHeld)) {
                 event.setCancelled(true);
                 CropManager.tryPlant(player, block, fdHeld);
@@ -131,18 +145,28 @@ public class BlockInteractListener implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (event.getView().title().equals(Component.text("Cooking Pot",
-            net.kyori.adventure.text.format.NamedTextColor.DARK_RED))) {
-            // find which pot this player has open — iterate loaded worlds/chunks is expensive,
-            // so we use a simpler "check nearby blocks" approach
+
+        // ── Custom GUI (guide book + recipe viewers) ───────────────────────
+        if (event.getInventory().getHolder() instanceof FDInventoryHolder holder) {
+            event.setCancelled(true);
+            if (event.getClickedInventory() == null) return;
+            if (!event.getInventory().equals(event.getClickedInventory())) return;
+            int slot = event.getSlot();
+            switch (holder.type) {
+                case GUIDE_MAIN -> handleGuideClick(player, slot);
+                case COOKING_RECIPES -> handleViewerClick(player, slot, holder.page,
+                    FDInventoryHolder.GuiType.COOKING_RECIPES);
+                case CUTTING_RECIPES -> handleViewerClick(player, slot, holder.page,
+                    FDInventoryHolder.GuiType.CUTTING_RECIPES);
+            }
+            return;
+        }
+
+        // ── Cooking Pot ────────────────────────────────────────────────────
+        if (event.getView().title().equals(Component.text("Cooking Pot", NamedTextColor.DARK_RED))) {
             Block target = player.getTargetBlockExact(5);
             if (target != null && pots.isCookingPot(target)) {
                 pots.handleGuiClick(player, event, target.getLocation());
-                if (event.getSlot() == 11 && event.getCurrentItem() != null
-                    && event.getCurrentItem().getType() != Material.AIR) {
-                    plugin.getServer().getScheduler().runTask(plugin, () ->
-                        pots.onOutputTaken(player, target.getLocation(), event.getInventory()));
-                }
             }
         }
     }
@@ -150,12 +174,34 @@ public class BlockInteractListener implements Listener {
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) return;
-        if (event.getView().title().equals(Component.text("Cooking Pot",
-            net.kyori.adventure.text.format.NamedTextColor.DARK_RED))) {
+        if (event.getView().title().equals(Component.text("Cooking Pot", NamedTextColor.DARK_RED))) {
             Block target = player.getTargetBlockExact(5);
             if (target != null && pots.isCookingPot(target)) {
                 pots.onClose(target.getLocation(), event.getInventory());
             }
+        }
+    }
+
+    private void handleGuideClick(Player player, int slot) {
+        switch (slot) {
+            case 11 -> RecipeViewerGui.openCooking(player, 0);
+            case 13 -> RecipeViewerGui.openCutting(player, 0);
+            case 15 -> player.sendMessage(Component.text(
+                "Open your crafting table and click the recipe book icon (bottom-left)!")
+                .color(NamedTextColor.YELLOW));
+        }
+    }
+
+    private void handleViewerClick(Player player, int slot, int page, FDInventoryHolder.GuiType type) {
+        if (slot == 45) { GuideBookGui.open(player); return; }
+        if (slot == 48) {
+            if (type == FDInventoryHolder.GuiType.COOKING_RECIPES) RecipeViewerGui.openCooking(player, page - 1);
+            else RecipeViewerGui.openCutting(player, page - 1);
+            return;
+        }
+        if (slot == 50) {
+            if (type == FDInventoryHolder.GuiType.COOKING_RECIPES) RecipeViewerGui.openCooking(player, page + 1);
+            else RecipeViewerGui.openCutting(player, page + 1);
         }
     }
 }

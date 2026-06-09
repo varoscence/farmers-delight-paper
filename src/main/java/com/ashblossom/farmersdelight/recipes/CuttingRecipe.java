@@ -24,6 +24,7 @@ public class CuttingRecipe {
         return false;
     }
 
+    public Object getInput() { return input; }
     public List<ChanceOutput> getOutputs() { return outputs; }
 
     public static Builder of(FDItems item) { return new Builder(item); }

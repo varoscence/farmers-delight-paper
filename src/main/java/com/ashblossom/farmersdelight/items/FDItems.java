@@ -199,6 +199,7 @@ public enum FDItems {
     }
 
     public String getId() { return id; }
+    public String getDisplayName() { return displayName; }
     public int getCmd() { return cmd; }
     public ItemType getItemType() { return type; }
     public Material getBaseMaterial() { return baseMaterial; }

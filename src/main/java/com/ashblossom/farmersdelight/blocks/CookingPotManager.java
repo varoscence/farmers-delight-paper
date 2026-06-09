@@ -1,17 +1,20 @@
 package com.ashblossom.farmersdelight.blocks;
 
 import com.ashblossom.farmersdelight.FarmersDelightPlugin;
+import com.ashblossom.farmersdelight.gui.RecipeViewerGui;
 import com.ashblossom.farmersdelight.items.FDItems;
 import com.ashblossom.farmersdelight.recipes.CookingRecipe;
 import com.ashblossom.farmersdelight.recipes.FDRecipes;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
-import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.*;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.*;
@@ -21,6 +24,7 @@ public class CookingPotManager {
     private static final int[] INGREDIENT_SLOTS = {0, 1, 2, 3, 4};
     private static final int OUTPUT_SLOT = 11;
     private static final int CONTAINER_SLOT = 12;
+    private static final int RECIPE_BOOK_SLOT = 26;
     private static final String PROGRESS_KEY = "cook_progress";
     private static final String RECIPE_KEY = "recipe_idx";
 
@@ -55,19 +59,85 @@ public class CookingPotManager {
 
     public void openPot(Player player, Location loc) {
         String k = key(loc);
+        boolean isNew = !openGuis.containsKey(k);
         Inventory inv = openGuis.computeIfAbsent(k, x ->
             plugin.getServer().createInventory(null, 27,
                 Component.text("Cooking Pot", NamedTextColor.DARK_RED)));
-        ItemStack[] contents = guiContents.get(k);
-        if (contents != null) inv.setContents(contents);
+
+        // Only restore saved contents when creating the inventory for the first time.
+        // After that the live inventory is authoritative (cooking task updates it directly).
+        if (isNew) {
+            ItemStack[] saved = guiContents.get(k);
+            if (saved != null) {
+                ItemStack[] restored = new ItemStack[27];
+                for (int s : INGREDIENT_SLOTS) if (s < saved.length) restored[s] = saved[s];
+                if (OUTPUT_SLOT < saved.length) restored[OUTPUT_SLOT] = saved[OUTPUT_SLOT];
+                if (CONTAINER_SLOT < saved.length) restored[CONTAINER_SLOT] = saved[CONTAINER_SLOT];
+                inv.setContents(restored);
+            }
+        }
+
+        // Overlay decorative glass and recipe book button (always refresh these)
+        ItemStack gray = makeGray();
+        for (int i = 5; i <= 10; i++) inv.setItem(i, gray);
+        for (int i = 13; i <= 25; i++) inv.setItem(i, gray);
+        inv.setItem(RECIPE_BOOK_SLOT, makeRecipeBookButton());
+
         player.openInventory(inv);
     }
 
     public void handleGuiClick(Player player, InventoryClickEvent event, Location potLoc) {
-        if (event.getSlot() == OUTPUT_SLOT
-            && (event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT)) {
+        if (event.getClickedInventory() == null) return;
+        Inventory potInv = event.getView().getTopInventory();
+        // Only intercept clicks in the cooking pot side (not player's own inventory)
+        if (!potInv.equals(event.getClickedInventory())) return;
+
+        int slot = event.getSlot();
+
+        // Recipe book button
+        if (slot == RECIPE_BOOK_SLOT) {
             event.setCancelled(true);
+            plugin.getServer().getScheduler().runTask(plugin, () ->
+                RecipeViewerGui.openCooking(player, 0));
+            return;
         }
+
+        // Check if this is a functional slot
+        boolean isIngredient = false;
+        for (int s : INGREDIENT_SLOTS) if (s == slot) { isIngredient = true; break; }
+
+        if (!isIngredient && slot != OUTPUT_SLOT && slot != CONTAINER_SLOT) {
+            event.setCancelled(true);
+            return;
+        }
+
+        // Output slot: block placing, allow taking
+        if (slot == OUTPUT_SLOT) {
+            InventoryAction action = event.getAction();
+            if (action == InventoryAction.PLACE_ALL || action == InventoryAction.PLACE_ONE
+                    || action == InventoryAction.PLACE_SOME || action == InventoryAction.SWAP_WITH_CURSOR) {
+                event.setCancelled(true);
+                return;
+            }
+            // Taking from output — schedule ingredient consumption on next tick
+            ItemStack out = potInv.getItem(OUTPUT_SLOT);
+            if (out != null && out.getType() != Material.AIR) {
+                plugin.getServer().getScheduler().runTask(plugin, () ->
+                    onOutputTaken(player, potLoc, potInv));
+            }
+            return;
+        }
+
+        // Container slot: block placing, allow taking
+        if (slot == CONTAINER_SLOT) {
+            InventoryAction action = event.getAction();
+            if (action == InventoryAction.PLACE_ALL || action == InventoryAction.PLACE_ONE
+                    || action == InventoryAction.PLACE_SOME || action == InventoryAction.SWAP_WITH_CURSOR) {
+                event.setCancelled(true);
+            }
+        }
+
+        // Ingredient slots: allow all interactions
     }
 
     public void onOutputTaken(Player player, Location potLoc, Inventory inv) {
@@ -102,15 +172,43 @@ public class CookingPotManager {
         storage.remove(potLoc, RECIPE_KEY);
         storage.remove(potLoc, PROGRESS_KEY);
         inv.setItem(OUTPUT_SLOT, new ItemStack(Material.AIR));
-        guiContents.put(key(potLoc), inv.getContents());
+        guiContents.put(key(potLoc), functionalContents(inv));
     }
 
     public void onClose(Location potLoc, Inventory inv) {
-        guiContents.put(key(potLoc), inv.getContents());
+        guiContents.put(key(potLoc), functionalContents(inv));
     }
 
     public void saveAll() {
         storage.save();
+    }
+
+    private ItemStack[] functionalContents(Inventory inv) {
+        ItemStack[] all = inv.getContents();
+        ItemStack[] out = new ItemStack[27];
+        for (int s : INGREDIENT_SLOTS) out[s] = all[s];
+        out[OUTPUT_SLOT] = all[OUTPUT_SLOT];
+        out[CONTAINER_SLOT] = all[CONTAINER_SLOT];
+        return out;
+    }
+
+    private ItemStack makeGray() {
+        ItemStack pane = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        ItemMeta meta = pane.getItemMeta();
+        meta.displayName(Component.empty());
+        pane.setItemMeta(meta);
+        return pane;
+    }
+
+    private ItemStack makeRecipeBookButton() {
+        ItemStack item = new ItemStack(Material.BOOK);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(Component.text("View Cooking Recipes").color(NamedTextColor.GREEN)
+            .decoration(TextDecoration.ITALIC, false));
+        meta.lore(List.of(Component.text("Click to browse all recipes.")
+            .color(NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+        item.setItemMeta(meta);
+        return item;
     }
 
     private boolean isHeated(Location potLoc) {
