@@ -20,6 +20,7 @@ by_material = defaultdict(list)
 for id_, mat, cmd in items:
     by_material[mat].append((id_, int(cmd)))
 
+tex_dir = 'src/main/resources/textures/item'
 entries = {}  # zip path -> bytes
 
 # pack.mcmeta
@@ -37,13 +38,19 @@ for id_, mat, cmd in items:
 # Item definition files (one per base material, CMD dispatch)
 for mat, mat_items in by_material.items():
     mat_lower = mat.lower()
+    # Only dispatch items that actually have a texture — items without textures
+    # fall back to vanilla material appearance (better than purple/black error texture)
     cases = [
         {
-            "when": cmd,  # integer — required in 1.21.5+ (was string array ["N"] in 1.21.4)
+            "when": cmd,
             "model": {"type": "minecraft:model", "model": f"farmersdelight:item/{id_}"}
         }
         for id_, cmd in mat_items
+        if os.path.exists(os.path.join(tex_dir, f'{id_}.png'))
     ]
+    if not cases:
+        print(f"  {mat_lower}.json: skipped (no textures)")
+        continue
     defn = {
         "model": {
             "type": "minecraft:select",
@@ -56,7 +63,6 @@ for mat, mat_items in by_material.items():
     print(f"  {mat_lower}.json: {len(mat_items)} items")
 
 # Textures
-tex_dir = 'src/main/resources/textures/item'
 found, missing = 0, 0
 for id_, mat, cmd in items:
     path = os.path.join(tex_dir, f'{id_}.png')

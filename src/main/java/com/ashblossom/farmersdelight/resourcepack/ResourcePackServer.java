@@ -90,8 +90,9 @@ public class ResourcePackServer {
                 }
                 for (Map.Entry<Material, List<FDItems>> entry : byMaterial.entrySet()) {
                     String name = entry.getKey().name().toLowerCase();
-                    addString(zip, "assets/minecraft/items/" + name + ".json",
-                        buildItemDefinition(entry.getKey(), entry.getValue()));
+                    String defJson = buildItemDefinition(entry.getKey(), entry.getValue());
+                    if (defJson == null) continue; // all items for this material lack textures
+                    addString(zip, "assets/minecraft/items/" + name + ".json", defJson);
                 }
 
                 // Textures
@@ -129,14 +130,20 @@ public class ResourcePackServer {
 
         JsonArray cases = new JsonArray();
         for (FDItems item : items) {
+            // Skip items with no texture — they'd show purple/black error texture
+            InputStream texCheck = plugin.getResource("textures/item/" + item.getId() + ".png");
+            if (texCheck == null) continue;
+            try { texCheck.close(); } catch (IOException ignored) {}
+
             JsonObject c = new JsonObject();
-            c.addProperty("when", item.getCmd()); // integer — required in 1.21.5+
+            c.addProperty("when", item.getCmd());
             JsonObject mdl = new JsonObject();
             mdl.addProperty("type", "minecraft:model");
             mdl.addProperty("model", "farmersdelight:item/" + item.getId());
             c.add("model", mdl);
             cases.add(c);
         }
+        if (cases.isEmpty()) return null;
         model.add("cases", cases);
 
         JsonObject fallback = new JsonObject();
