@@ -1,0 +1,18 @@
+name: FarmersDelightPaper
+version: '1.0.0'
+main: com.ashblossom.farmersdelight.FarmersDelightPlugin
+api-version: '1.21'
+description: Farmer's Delight full port for Paper 1.21.x
+authors: [AshBlossom]
+load: STARTUP
+
+commands:
+  fd:
+    description: Farmer's Delight admin commands
+    usage: /fd <give|list|reload> [args]
+    permission: farmersdelight.admin
+
+permissions:
+  farmersdelight.admin:
+    description: Access to Farmer's Delight admin commands
+    default: op
