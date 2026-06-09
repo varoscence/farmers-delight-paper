@@ -1,0 +1,58 @@
+name: Build FarmersDelight Paper
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Download Farmer's Delight textures
+        run: |
+          BASE="https://raw.githubusercontent.com/vectorwing/FarmersDelight/1.21/src/main/resources/assets/farmersdelight/textures/item"
+          DEST="src/main/resources/textures/item"
+          mkdir -p "$DEST"
+          ITEMS=(
+            "flint_knife" "iron_knife" "golden_knife" "diamond_knife" "netherite_knife"
+            "cabbage" "cabbage_leaf" "cabbage_seeds" "tomato" "tomato_slice" "tomato_seeds"
+            "onion" "rice" "rice_panicle" "pumpkin_slice"
+            "wheat_dough" "bread_slice" "cake_slice"
+            "minced_beef" "bacon" "ham_slice" "smoked_ham" "honey_glazed_ham"
+            "beef_stew" "chicken_soup" "fish_stew" "vegetable_soup" "pumpkin_soup"
+            "mushroom_stew" "noodle_soup" "ramen" "borscht" "potato_soup"
+            "hamburger" "chicken_sandwich" "bacon_sandwich" "mutton_wrap" "salmon_roll"
+            "rice_bowl" "fried_rice" "pasta_with_meatballs" "pasta_with_mutton_chop"
+            "hot_cocoa" "apple_cider" "melon_juice" "tomato_sauce"
+            "roast_chicken" "honey_glazed_ham" "kelp_roll" "kelp_roll_slice"
+            "shepherd_pie" "apple_pie" "birthday_cake"
+            "bone_meal_bag" "straw_bale" "canvas" "hemp_rope" "rope_roll" "sack" "basket"
+            "cooking_pot" "cutting_board" "dried_kelp_block"
+          )
+          for item in "${ITEMS[@]}"; do
+            echo "Downloading $item.png"
+            curl -sf "$BASE/$item.png" -o "$DEST/$item.png" || echo "  (not found, skipping)"
+          done
+
+      - name: Build with Maven
+        run: mvn package -q
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FarmersDelightPaper
+          path: target/farmers-delight-paper-*.jar
+          retention-days: 30
