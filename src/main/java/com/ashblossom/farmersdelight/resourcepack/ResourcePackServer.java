@@ -25,17 +25,43 @@ public class ResourcePackServer {
     public void start() {
         rebuildPack();
 
-        String host = plugin.getConfig().getString("resource-pack-host", "").trim();
-        int port = plugin.getServer().getPort();
-
-        if (host.isEmpty()) {
-            plugin.getLogger().warning("resource-pack-host is not set in config.yml — resource pack won't be sent to players.");
-            plugin.getLogger().warning("Set it to your server's external IP, e.g.: resource-pack-host: \"136.175.187.108\"");
+        // Primary: GitHub Pages (or any explicit URL set in config).
+        // This is the reliable path — the pack is also bundled in the JAR
+        // so the Netty injector can serve it on the game port as a bonus,
+        // but the URL sent to players always points here.
+        String externalUrl = plugin.getConfig().getString("resource-pack-url", "").trim();
+        if (!externalUrl.isEmpty()) {
+            packUrl = externalUrl;
+            String sha1Url = externalUrl.replaceAll("pack\\.zip$", "pack.sha1");
+            try {
+                java.net.URLConnection conn = new java.net.URI(sha1Url).toURL().openConnection();
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                try (InputStream in = conn.getInputStream()) {
+                    String hex = new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
+                    packHash = hexToBytes(hex);
+                    plugin.getLogger().info("Resource pack SHA1: " + hex);
+                }
+            } catch (Exception e) {
+                plugin.getLogger().warning("Could not fetch pack SHA1: " + e.getMessage() +
+                    " — players will be prompted without hash verification.");
+                packHash = new byte[0];
+            }
+            plugin.getLogger().info("Resource pack URL: " + packUrl);
             return;
         }
 
-        packUrl = "http://" + host + ":" + port + "/pack.zip";
-        plugin.getLogger().info("Resource pack URL: " + packUrl);
+        // Fallback: serve from the game port via Netty injection.
+        // Requires resource-pack-host to be set to the server's external IP.
+        String host = plugin.getConfig().getString("resource-pack-host", "").trim();
+        if (!host.isEmpty()) {
+            int port = plugin.getServer().getPort();
+            packUrl  = "http://" + host + ":" + port + "/pack.zip";
+            packHash = MessageDigest_sha1(packBytes);
+            plugin.getLogger().info("Resource pack will be served on game port: " + packUrl);
+        } else {
+            plugin.getLogger().warning("No resource-pack-url or resource-pack-host set in config.yml — pack will not be sent to players.");
+        }
     }
 
     public void stop() {}
@@ -74,10 +100,9 @@ public class ResourcePackServer {
                         texMissing++;
                     }
                 }
-                plugin.getLogger().info("Pack built: " + texFound + " textures included, " + texMissing + " missing.");
+                plugin.getLogger().info("Pack built: " + texFound + " textures, " + texMissing + " missing.");
             }
             packBytes = bos.toByteArray();
-            packHash  = MessageDigest.getInstance("SHA-1").digest(packBytes);
             plugin.getLogger().info("Pack size: " + packBytes.length + " bytes");
         } catch (Exception e) {
             plugin.getLogger().severe("Failed to build resource pack: " + e.getMessage());
@@ -111,7 +136,7 @@ public class ResourcePackServer {
         }
         if (cases.isEmpty()) return null;
 
-        JsonObject root = new JsonObject();
+        JsonObject root  = new JsonObject();
         JsonObject model = new JsonObject();
         model.addProperty("type", "minecraft:select");
         model.addProperty("property", "minecraft:custom_model_data");
@@ -139,7 +164,20 @@ public class ResourcePackServer {
         zip.closeEntry();
     }
 
-    public String getUrl()        { return packUrl; }
-    public byte[] getHash()       { return packHash; }
-    public byte[] getPackBytes()  { return packBytes; }
+    private static byte[] MessageDigest_sha1(byte[] data) {
+        try { return MessageDigest.getInstance("SHA-1").digest(data); }
+        catch (Exception e) { return new byte[0]; }
+    }
+
+    private static byte[] hexToBytes(String hex) {
+        int len = hex.length();
+        byte[] out = new byte[len / 2];
+        for (int i = 0; i < len; i += 2)
+            out[i/2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4) + Character.digit(hex.charAt(i+1), 16));
+        return out;
+    }
+
+    public String getUrl()       { return packUrl; }
+    public byte[] getHash()      { return packHash; }
+    public byte[] getPackBytes() { return packBytes; }
 }
