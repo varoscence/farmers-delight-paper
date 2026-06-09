@@ -57,9 +57,14 @@ public class ResourcePackServer {
                     byMat.computeIfAbsent(item.getBaseMaterial(), k -> new ArrayList<>()).add(item);
 
                 for (Map.Entry<Material, List<FDItems>> e : byMat.entrySet()) {
+                    // New format (1.21.4+ clients): assets/minecraft/items/
                     String json = buildItemDefinitionJson(e.getKey(), e.getValue());
                     if (json != null)
                         addString(zip, "assets/minecraft/items/" + e.getKey().name().toLowerCase() + ".json", json);
+                    // Old format (1.21.1 clients): assets/minecraft/models/item/ with predicate overrides
+                    String legacyJson = buildModelOverridesJson(e.getKey(), e.getValue());
+                    if (legacyJson != null)
+                        addString(zip, "assets/minecraft/models/item/" + e.getKey().name().toLowerCase() + ".json", legacyJson);
                 }
 
                 // Textures — all bundled inside the JAR under textures/item/
@@ -127,6 +132,36 @@ public class ResourcePackServer {
 
         JsonObject root = new JsonObject();
         root.add("model", model);
+        return new GsonBuilder().setPrettyPrinting().create().toJson(root);
+    }
+
+    private String buildModelOverridesJson(Material mat, List<FDItems> items) {
+        JsonArray overrides = new JsonArray();
+        for (FDItems item : items) {
+            try (InputStream check = plugin.getResource("textures/item/" + item.getId() + ".png")) {
+                if (check == null) continue;
+            } catch (IOException ignored) { continue; }
+
+            JsonObject predicate = new JsonObject();
+            predicate.addProperty("custom_model_data", item.getCmd());
+            JsonObject override = new JsonObject();
+            override.add("predicate", predicate);
+            override.addProperty("model", "farmersdelight:item/" + item.getId());
+            overrides.add(override);
+        }
+        if (overrides.isEmpty()) return null;
+
+        String matName = mat.name().toLowerCase();
+        boolean isTool = matName.contains("sword") || matName.contains("axe") || matName.contains("pickaxe");
+        String parent = isTool ? "minecraft:item/handheld" : "minecraft:item/generated";
+
+        JsonObject textures = new JsonObject();
+        textures.addProperty("layer0", "minecraft:item/" + matName);
+
+        JsonObject root = new JsonObject();
+        root.addProperty("parent", parent);
+        root.add("textures", textures);
+        root.add("overrides", overrides);
         return new GsonBuilder().setPrettyPrinting().create().toJson(root);
     }
 

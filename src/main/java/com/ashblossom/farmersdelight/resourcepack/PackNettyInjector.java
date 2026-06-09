@@ -3,6 +3,7 @@ package com.ashblossom.farmersdelight.resourcepack;
 import com.ashblossom.farmersdelight.FarmersDelightPlugin;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
+import io.netty.channel.ServerChannel;
 import org.bukkit.Bukkit;
 
 import java.lang.reflect.Field;
@@ -126,10 +127,12 @@ public class PackNettyInjector {
 
         if (futures == null || futures.isEmpty()) return 0;
 
-        // -- Step 4: Inject into each listening channel --
+        // -- Step 4: Inject into each listening (server socket) channel --
         int count = 0;
         for (ChannelFuture cf : futures) {
             Channel serverCh = cf.channel();
+            // Only inject into server-side listening channels, not active client connections
+            if (!(serverCh instanceof ServerChannel)) continue;
             if (serverCh.pipeline().get(INIT_KEY) != null) { count++; continue; } // already done
             serverCh.pipeline().addFirst(INIT_KEY, new ChannelInboundHandlerAdapter() {
                 @Override
@@ -193,6 +196,12 @@ public class PackNettyInjector {
             if (isHttp) {
                 buf.release();
                 byte[] data = plugin.getResourcePackServer().getPackBytes();
+                plugin.getLogger().info("[FD] Serving resource pack via HTTP: " + data.length + " bytes");
+                if (data.length == 0) {
+                    plugin.getLogger().warning("[FD] Pack bytes are empty — rebuild may have failed. Check startup logs.");
+                    ctx.close();
+                    return;
+                }
                 String header = "HTTP/1.1 200 OK\r\n"
                     + "Content-Type: application/octet-stream\r\n"
                     + "Content-Length: " + data.length + "\r\n"
