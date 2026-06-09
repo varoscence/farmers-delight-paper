@@ -1,8 +1,7 @@
 # Farmer's Delight Paper - Config
-
-# External resource pack URL (GitHub Pages). Leave empty to use built-in HTTP server.
-resource-pack-url: "https://varoscence.github.io/farmers-delight-paper/pack.zip"
-
-# Only used when resource-pack-url is empty (self-hosted fallback)
+#
+# The resource pack is built from textures bundled inside the plugin JAR
+# and served directly on the Minecraft game port — no extra ports needed.
+#
+# Set this to your server's external IP address.
 resource-pack-host: "136.175.187.108"
-resource-pack-port: 8766

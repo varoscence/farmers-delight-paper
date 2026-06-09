@@ -9,6 +9,7 @@ import com.ashblossom.farmersdelight.listeners.CropListener;
 import com.ashblossom.farmersdelight.listeners.FoodConsumeListener;
 import com.ashblossom.farmersdelight.listeners.PlayerJoinListener;
 import com.ashblossom.farmersdelight.recipes.FDRecipes;
+import com.ashblossom.farmersdelight.resourcepack.PackNettyInjector;
 import com.ashblossom.farmersdelight.resourcepack.ResourcePackServer;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -27,6 +28,7 @@ public class FarmersDelightPlugin extends JavaPlugin {
 
         resourcePackServer = new ResourcePackServer(this);
         resourcePackServer.start();
+        PackNettyInjector.inject(this);
 
         FDRecipes.register(this);
 
@@ -45,6 +47,7 @@ public class FarmersDelightPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        PackNettyInjector.remove();
         if (resourcePackServer != null) resourcePackServer.stop();
         if (cookingPotManager != null) cookingPotManager.saveAll();
     }
