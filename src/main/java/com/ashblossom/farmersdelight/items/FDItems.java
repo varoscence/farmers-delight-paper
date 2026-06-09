@@ -202,6 +202,7 @@ public enum FDItems {
     public int getCmd() { return cmd; }
     public ItemType getItemType() { return type; }
     public Material getBaseMaterial() { return baseMaterial; }
+    public PotionEffect getEffect() { return effect; }
 
     public ItemStack create() { return createItem(1); }
     public ItemStack create(int amount) { return createItem(amount); }
@@ -225,7 +226,7 @@ public enum FDItems {
             food.setNutrition(nutrition);
             food.setSaturation(saturation);
             food.setCanAlwaysEat(false);
-            if (effect != null) food.addEffect(food.createEffect(effect, 1.0f));
+            // effects applied via FoodConsumeListener to avoid FoodComponent API version issues
             meta.setFood(food);
         }
 

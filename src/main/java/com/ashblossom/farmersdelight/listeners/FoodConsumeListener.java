@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
 
 public class FoodConsumeListener implements Listener {
 
@@ -22,6 +23,12 @@ public class FoodConsumeListener implements Listener {
 
         FDItems fdItem = FDItems.fromStack(item);
         if (fdItem == null) return;
+
+        PotionEffect effect = fdItem.getEffect();
+        if (effect != null) {
+            FarmersDelightPlugin.get().getServer().getScheduler().runTask(
+                FarmersDelightPlugin.get(), () -> player.addPotionEffect(effect));
+        }
 
         if (fdItem.getItemType() == FDItems.ItemType.BOWL_FOOD) {
             giveBack(player, new ItemStack(Material.BOWL));
