@@ -90,7 +90,7 @@ public enum FDItems {
 
     // MEALS
     MIXED_SALAD(    "mixed_salad",     "Mixed Salad",     Material.PAPER, 7001, 6,  0.6f, e(PotionEffectType.REGENERATION, 60, 0),  ItemType.FOOD, 0, 0),
-    NETHER_SALAD(   "nether_salad",    "Nether Salad",    Material.PAPER, 7002, 5,  0.4f, e(PotionEffectType.CONFUSION, 200, 0),    ItemType.FOOD, 0, 0),
+    NETHER_SALAD(   "nether_salad",    "Nether Salad",    Material.PAPER, 7002, 5,  0.4f, e(PotionEffectType.NAUSEA, 200, 0),      ItemType.FOOD, 0, 0),
     BARBECUE_STICK( "barbecue_stick",  "Barbecue Stick",  Material.PAPER, 7003, 8,  0.9f, null, ItemType.FOOD, 0, 0),
     EGG_SANDWICH(   "egg_sandwich",    "Egg Sandwich",    Material.PAPER, 7004, 8,  0.8f, null, ItemType.FOOD, 0, 0),
     CHICKEN_SANDWICH("chicken_sandwich","Chicken Sandwich",Material.PAPER,7005, 10, 0.8f, null, ItemType.FOOD, 0, 0),
@@ -225,9 +225,7 @@ public enum FDItems {
             food.setNutrition(nutrition);
             food.setSaturation(saturation);
             food.setCanAlwaysEat(false);
-            if (effect != null) food.addEffect(effect, 1.0f);
-            if (type == ItemType.BOWL_FOOD) food.setUsingConvertsTo(new ItemStack(Material.BOWL));
-            if (type == ItemType.DRINK)     food.setUsingConvertsTo(new ItemStack(Material.GLASS_BOTTLE));
+            if (effect != null) food.addEffect(food.createEffect(effect, 1.0f));
             meta.setFood(food);
         }
 
