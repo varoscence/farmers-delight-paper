@@ -26,8 +26,11 @@ public class PlayerJoinListener implements Listener {
             if (url == null) return;
             byte[] hash = packServer.getHash();
             byte[] hashArg = (hash != null && hash.length > 0) ? hash : null;
-            // Use stable UUID derived from URL so Minecraft can cache the pack between sessions
-            UUID packId = UUID.nameUUIDFromBytes(url.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            // Derive UUID from hash bytes — changes whenever pack content changes,
+            // so Minecraft never reuses a stale cached pack
+            UUID packId = (hashArg != null)
+                ? UUID.nameUUIDFromBytes(hashArg)
+                : UUID.nameUUIDFromBytes(url.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             player.setResourcePack(packId, url, hashArg,
                 net.kyori.adventure.text.Component.text("Farmer's Delight resource pack"), true);
         }, 20L);

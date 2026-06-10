@@ -86,6 +86,15 @@ public class ResourcePackServer {
             }
             packBytes = bos.toByteArray();
             packHash  = MessageDigest.getInstance("SHA-1").digest(packBytes);
+            // Write pack to disk so it can be manually inspected or loaded
+            try {
+                java.io.File out = new java.io.File(plugin.getDataFolder(), "debug_pack.zip");
+                plugin.getDataFolder().mkdirs();
+                java.nio.file.Files.write(out.toPath(), packBytes);
+                plugin.getLogger().info("[FD] Debug pack written to " + out.getAbsolutePath());
+            } catch (Exception ex) {
+                plugin.getLogger().warning("[FD] Could not write debug pack: " + ex.getMessage());
+            }
         } catch (Exception e) {
             plugin.getLogger().severe("[FD] Failed to build resource pack: " + e.getMessage());
         }
