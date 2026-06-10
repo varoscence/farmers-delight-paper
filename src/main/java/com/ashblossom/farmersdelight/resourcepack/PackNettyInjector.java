@@ -22,24 +22,26 @@ public class PackNettyInjector {
     }
 
     private static void scheduleAttempt(FarmersDelightPlugin plugin, int attempt) {
+        // Delays: 2, 20, 40, 60, 80, 100, 120, 140, 160, 180 ticks (0.1s to 9s)
+        long delay = attempt == 1 ? 2L : (attempt - 1) * 20L;
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             try {
                 int injected = doInject(plugin);
                 if (injected > 0) {
                     plugin.getLogger().info("[FD] Resource pack Netty handler active on game port "
                         + plugin.getServer().getPort() + " (" + injected + " channel(s))");
-                } else if (attempt < 5) {
-                    plugin.getLogger().info("[FD] No server channels found yet, retrying (" + attempt + "/5)...");
+                } else if (attempt < 10) {
+                    plugin.getLogger().info("[FD] No server channels found yet, retrying (" + attempt + "/10)...");
                     scheduleAttempt(plugin, attempt + 1);
                 } else {
-                    plugin.getLogger().warning("[FD] Could not find server channels after 5 attempts.");
-                    plugin.getLogger().warning("[FD] Resource pack is still served via the configured URL if set.");
+                    plugin.getLogger().warning("[FD] Could not find server channels after 10 attempts.");
+                    plugin.getLogger().warning("[FD] Resource pack serving via Netty failed — players will not receive textures.");
                 }
             } catch (Exception e) {
                 plugin.getLogger().warning("[FD] Netty injection error (attempt " + attempt + "): " + e.getMessage());
-                if (attempt < 3) scheduleAttempt(plugin, attempt + 1);
+                if (attempt < 10) scheduleAttempt(plugin, attempt + 1);
             }
-        }, attempt * 5L); // 5, 10, 15, 20, 25 ticks
+        }, delay);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
