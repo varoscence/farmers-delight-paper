@@ -69,9 +69,9 @@ public class AdminCommandListener implements Listener, CommandExecutor {
                     size > 1000 ? NamedTextColor.GREEN : NamedTextColor.RED));
                 sender.sendMessage(Component.text("Hash: " + (hash != null && hash.length == 20 ? "OK (20 bytes)" : "MISSING"),
                     hash != null && hash.length == 20 ? NamedTextColor.GREEN : NamedTextColor.RED));
-                // Self-test: open a socket to localhost and send GET request
+                // Self-test: connect to the dedicated HTTP port
                 plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
-                    int port = plugin.getServer().getPort();
+                    int port = rps.getHttpPort();
                     try (Socket s = new Socket("127.0.0.1", port)) {
                         s.setSoTimeout(3000);
                         OutputStream out = s.getOutputStream();
@@ -84,11 +84,11 @@ public class AdminCommandListener implements Listener, CommandExecutor {
                         boolean ok = resp.startsWith("HTTP/1.1 200");
                         plugin.getServer().getScheduler().runTask(plugin, () ->
                             sender.sendMessage(Component.text(
-                                "HTTP self-test: " + (ok ? "PASS — Netty serving pack" : "FAIL — '" + resp.replace("\r","").replace("\n"," ") + "'"),
+                                "HTTP self-test (port " + port + "): " + (ok ? "PASS" : "FAIL — " + resp.replace("\r","").replace("\n"," ")),
                                 ok ? NamedTextColor.GREEN : NamedTextColor.RED)));
                     } catch (Exception e) {
                         plugin.getServer().getScheduler().runTask(plugin, () ->
-                            sender.sendMessage(Component.text("HTTP self-test: FAIL — " + e.getMessage(), NamedTextColor.RED)));
+                            sender.sendMessage(Component.text("HTTP self-test (port " + port + "): FAIL — " + e.getMessage(), NamedTextColor.RED)));
                     }
                 });
             }

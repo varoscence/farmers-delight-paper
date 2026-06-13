@@ -3,11 +3,14 @@ package com.ashblossom.farmersdelight.resourcepack;
 import com.ashblossom.farmersdelight.FarmersDelightPlugin;
 import com.ashblossom.farmersdelight.items.FDItems;
 import com.google.gson.*;
+import com.sun.net.httpserver.HttpServer;
 
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
+import java.util.concurrent.Executors;
 import java.util.zip.*;
 import org.bukkit.Material;
 
@@ -17,26 +20,56 @@ public class ResourcePackServer {
     private volatile byte[] packBytes = new byte[0];
     private volatile byte[] packHash  = new byte[0];
     private String packUrl;
+    private HttpServer httpServer;
 
     public ResourcePackServer(FarmersDelightPlugin plugin) {
         this.plugin = plugin;
     }
 
     public void start() {
-        rebuildPack(); // textures are bundled in the JAR — always available
+        rebuildPack();
 
         String host = plugin.getConfig().getString("resource-pack-host", "").trim();
         if (host.isEmpty()) {
             plugin.getLogger().severe("[FD] resource-pack-host is not set in config.yml!");
-            plugin.getLogger().severe("[FD] Edit plugins/FarmersDelight/config.yml and set it to your server IP.");
             return;
         }
-        int port = plugin.getServer().getPort();
-        packUrl = "http://" + host + ":" + port + "/pack.zip";
-        plugin.getLogger().info("[FD] Pack URL: " + packUrl + "  (" + packBytes.length + " bytes)");
+
+        int httpPort = plugin.getConfig().getInt("resource-pack-port", 28083);
+
+        try {
+            httpServer = HttpServer.create(new InetSocketAddress(httpPort), 0);
+            httpServer.createContext("/pack.zip", exchange -> {
+                if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    exchange.sendResponseHeaders(405, -1);
+                    exchange.close();
+                    return;
+                }
+                byte[] data = packBytes;
+                exchange.getResponseHeaders().set("Content-Type", "application/octet-stream");
+                exchange.sendResponseHeaders(200, data.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(data);
+                }
+                plugin.getLogger().info("[FD] Served resource pack: " + data.length + " bytes");
+            });
+            httpServer.setExecutor(Executors.newCachedThreadPool());
+            httpServer.start();
+
+            packUrl = "http://" + host + ":" + httpPort + "/pack.zip";
+            plugin.getLogger().info("[FD] Pack HTTP server started on port " + httpPort);
+            plugin.getLogger().info("[FD] Pack URL: " + packUrl + " (" + packBytes.length + " bytes)");
+        } catch (IOException e) {
+            plugin.getLogger().severe("[FD] Could not start HTTP server on port " + httpPort + ": " + e.getMessage());
+        }
     }
 
-    public void stop() {}
+    public void stop() {
+        if (httpServer != null) {
+            httpServer.stop(0);
+            httpServer = null;
+        }
+    }
 
     public void rebuildPack() {
         try {
@@ -44,25 +77,22 @@ public class ResourcePackServer {
             try (ZipOutputStream zip = new ZipOutputStream(bos)) {
                 addResource(zip, "pack.mcmeta", "pack/pack.mcmeta");
 
-                // One model file per item (flat sprite using bundled texture)
                 for (FDItems item : FDItems.values()) {
                     addString(zip,
                         "assets/farmersdelight/models/item/" + item.getId() + ".json",
                         buildModelJson(item));
                 }
 
-                // One item-definition file per base material (CMD dispatch)
                 Map<Material, List<FDItems>> byMat = new LinkedHashMap<>();
                 for (FDItems item : FDItems.values())
                     byMat.computeIfAbsent(item.getBaseMaterial(), k -> new ArrayList<>()).add(item);
 
                 for (Map.Entry<Material, List<FDItems>> e : byMat.entrySet()) {
-                    String legacyJson = buildModelOverridesJson(e.getKey(), e.getValue());
-                    if (legacyJson != null)
-                        addString(zip, "assets/minecraft/models/item/" + e.getKey().name().toLowerCase() + ".json", legacyJson);
+                    String json = buildModelOverridesJson(e.getKey(), e.getValue());
+                    if (json != null)
+                        addString(zip, "assets/minecraft/models/item/" + e.getKey().name().toLowerCase() + ".json", json);
                 }
 
-                // Textures — all bundled inside the JAR under textures/item/
                 int found = 0, missing = 0;
                 for (FDItems item : FDItems.values()) {
                     String path = "textures/item/" + item.getId() + ".png";
@@ -81,15 +111,6 @@ public class ResourcePackServer {
             }
             packBytes = bos.toByteArray();
             packHash  = MessageDigest.getInstance("SHA-1").digest(packBytes);
-            // Write pack to disk so it can be manually inspected or loaded
-            try {
-                java.io.File out = new java.io.File(plugin.getDataFolder(), "debug_pack.zip");
-                plugin.getDataFolder().mkdirs();
-                java.nio.file.Files.write(out.toPath(), packBytes);
-                plugin.getLogger().info("[FD] Debug pack written to " + out.getAbsolutePath());
-            } catch (Exception ex) {
-                plugin.getLogger().warning("[FD] Could not write debug pack: " + ex.getMessage());
-            }
         } catch (Exception e) {
             plugin.getLogger().severe("[FD] Failed to build resource pack: " + e.getMessage());
         }
@@ -122,14 +143,11 @@ public class ResourcePackServer {
         }
         if (overrides.isEmpty()) return null;
 
-        String matName = mat.name().toLowerCase();
-        String parent = "minecraft:item/generated";
-
         JsonObject textures = new JsonObject();
-        textures.addProperty("layer0", "minecraft:item/" + matName);
+        textures.addProperty("layer0", "minecraft:item/" + mat.name().toLowerCase());
 
         JsonObject root = new JsonObject();
-        root.addProperty("parent", parent);
+        root.addProperty("parent", "minecraft:item/generated");
         root.add("textures", textures);
         root.add("overrides", overrides);
         return new GsonBuilder().setPrettyPrinting().create().toJson(root);
@@ -157,4 +175,5 @@ public class ResourcePackServer {
     public String getUrl()       { return packUrl; }
     public byte[] getHash()      { return packHash; }
     public byte[] getPackBytes() { return packBytes; }
+    public int getHttpPort()     { return plugin.getConfig().getInt("resource-pack-port", 28083); }
 }

@@ -1,3 +1,5 @@
 # Farmer's Delight Paper - Config
-# Set this to your server's external IP address (the one players connect to).
+# resource-pack-host: your server's public IP (the one players connect to)
+# resource-pack-port: dedicated HTTP port — must be open in your host's control panel
 resource-pack-host: "136.175.187.112"
+resource-pack-port: 28083
