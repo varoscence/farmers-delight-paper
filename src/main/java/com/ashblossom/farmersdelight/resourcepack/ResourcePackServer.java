@@ -57,11 +57,6 @@ public class ResourcePackServer {
                     byMat.computeIfAbsent(item.getBaseMaterial(), k -> new ArrayList<>()).add(item);
 
                 for (Map.Entry<Material, List<FDItems>> e : byMat.entrySet()) {
-                    // New format (1.21.4+ clients): assets/minecraft/items/
-                    String json = buildItemDefinitionJson(e.getKey(), e.getValue());
-                    if (json != null)
-                        addString(zip, "assets/minecraft/items/" + e.getKey().name().toLowerCase() + ".json", json);
-                    // Old format (1.21.1 clients): assets/minecraft/models/item/ with predicate overrides
                     String legacyJson = buildModelOverridesJson(e.getKey(), e.getValue());
                     if (legacyJson != null)
                         addString(zip, "assets/minecraft/models/item/" + e.getKey().name().toLowerCase() + ".json", legacyJson);
@@ -109,39 +104,6 @@ public class ResourcePackServer {
         tex.addProperty("layer0", "farmersdelight:item/" + item.getId());
         root.add("textures", tex);
         return new Gson().toJson(root);
-    }
-
-    private String buildItemDefinitionJson(Material mat, List<FDItems> items) {
-        JsonArray cases = new JsonArray();
-        for (FDItems item : items) {
-            // Only add dispatch case if the texture is actually in the JAR
-            try (InputStream check = plugin.getResource("textures/item/" + item.getId() + ".png")) {
-                if (check == null) continue;
-            } catch (IOException ignored) { continue; }
-
-            JsonObject c = new JsonObject();
-            c.addProperty("when", item.getCmd());
-            JsonObject mdl = new JsonObject();
-            mdl.addProperty("type", "minecraft:model");
-            mdl.addProperty("model", "farmersdelight:item/" + item.getId());
-            c.add("model", mdl);
-            cases.add(c);
-        }
-        if (cases.isEmpty()) return null;
-
-        JsonObject fallback = new JsonObject();
-        fallback.addProperty("type", "minecraft:model");
-        fallback.addProperty("model", "minecraft:item/" + mat.name().toLowerCase());
-
-        JsonObject model = new JsonObject();
-        model.addProperty("type", "minecraft:select");
-        model.addProperty("property", "minecraft:custom_model_data");
-        model.add("cases", cases);
-        model.add("fallback", fallback);
-
-        JsonObject root = new JsonObject();
-        root.add("model", model);
-        return new GsonBuilder().setPrettyPrinting().create().toJson(root);
     }
 
     private String buildModelOverridesJson(Material mat, List<FDItems> items) {
